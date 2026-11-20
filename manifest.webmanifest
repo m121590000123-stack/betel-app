@@ -1,0 +1,14 @@
+{
+  "name": "檳榔攤記帳",
+  "short_name": "檳榔攤記帳",
+  "lang": "zh-Hant-TW",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FFFCF6",
+  "theme_color": "#FFFCF6",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

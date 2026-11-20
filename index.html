@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>檳榔攤記帳</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="檳榔攤記帳">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FFFCF6">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Huninn&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#FFFCF6;--ink:#3E3A39;--coral:#F2A497;--yellow:#F6D27A;--water:#A8D3E6;--green:#B9DAA5;
+  font-family:'Huninn','PingFang TC','Noto Sans TC',sans-serif;color:var(--ink);background:var(--paper)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--paper);overflow:hidden}
+#app{position:fixed;inset:0;width:100%;height:100%;border:0;background:var(--paper)}
+.screen{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;z-index:5;transition:opacity .35s}
+.screen.gone{opacity:0;pointer-events:none}
+.screen[hidden]{display:none}
+.logo{width:120px;height:120px;border-radius:27px;border:3px solid var(--ink)}
+.splash p{font-size:20px;margin:16px 0 0}
+.splash .logo{animation:bob 1.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.setup h1{font-size:26px;font-weight:400;margin:14px 0 4px}
+.setup .hint{font-size:16px;margin:0 0 6px;line-height:1.6}
+.dots{display:flex;justify-content:center;gap:10px;margin:14px 0;min-height:24px}
+.dots span{width:20px;height:20px;border:3px solid var(--ink);border-radius:50%}
+.dots span.on{background:var(--coral)}
+.msg{min-height:26px;font-size:17px;margin:0 0 8px}
+.msg.err{color:#A0452F}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:320px}
+.btn{font:inherit;color:var(--ink);border:3px solid var(--ink);border-radius:20px;background:var(--paper);min-height:62px;font-size:26px;cursor:pointer;box-shadow:0 4px 0 var(--ink)}
+.btn:active{transform:translateY(4px);box-shadow:none}
+.btn.sm{font-size:17px;background:#A8D3E650}
+.btn.ok{grid-column:1/-1;background:var(--coral);font-size:22px}
+.btn:disabled{opacity:.45}
+.shake{animation:shake .4s}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<iframe id="app" title="檳榔攤記帳" allow="clipboard-write"></iframe>
+
+<div class="screen splash" id="splash">
+  <img class="logo" src="icon-512.png" alt="檳榔攤記帳">
+  <p id="splashText">準備中，請稍等一下…</p>
+</div>
+
+<div class="screen setup" id="setup" hidden>
+  <img class="logo" src="icon-512.png" alt="檳榔攤記帳" style="width:96px;height:96px">
+  <h1>第一次使用</h1>
+  <p class="hint">請家人輸入「家庭碼」（6～8 位數字）<br>這支手機以後就不用再輸入了</p>
+  <div class="dots" id="dots"></div>
+  <p class="msg" id="msg"></p>
+  <div class="pad" id="pad"></div>
+</div>
+
+<script>
+const EXEC='https://script.google.com/macros/s/AKfycbz0of_cj2BSZH0J15ZOQefoJz6KmlzIjbQdBWkw_LbnOzRjySgh0xdP0eZIfRovrjOq5Q/exec';
+const KEY='betelFamilyCode';
+const $=id=>document.getElementById(id);
+let code='',typed='',shown=false;
+
+function save(v){try{v?localStorage.setItem(KEY,v):localStorage.removeItem(KEY)}catch(e){}}
+function read(){try{return localStorage.getItem(KEY)||''}catch(e){return ''}}
+function url(page){return EXEC+'?embed=1&k='+encodeURIComponent(code)+(page==='report'?'&page=report':'')}
+
+/* 確認家庭碼：回傳 true / false；網路有問題回傳 null */
+async function verify(c){
+  try{const r=await fetch(EXEC+'?check=1&k='+encodeURIComponent(c),{cache:'no-store'});const j=await r.json();return !!j.ok}
+  catch(e){return null}}
+
+/* 打開記帳 App */
+function open(page){
+  $('setup').hidden=true;$('splash').hidden=false;$('splash').classList.remove('gone');
+  $('splashText').textContent='準備中，請稍等一下…';
+  const f=$('app');f.onload=()=>setTimeout(()=>$('splash').classList.add('gone'),250);
+  f.src=url(page);
+  setTimeout(()=>{if(!$('splash').classList.contains('gone'))$('splashText').textContent='網路比較慢，再等一下下…'},8000)}
+
+/* 記帳頁、報表頁互相切換（只接受 Google Apps Script 頁面送來的訊息） */
+window.addEventListener('message',ev=>{
+  let host='';try{host=new URL(ev.origin).hostname}catch(e){}
+  if(!/\.googleusercontent\.com$/.test(host))return;
+  const d=ev.data||{};if(d.betel!=='nav')return;
+  if(d.page==='report'||d.page==='home')open(d.page==='report'?'report':'home')});
+
+/* 家庭碼輸入畫面 */
+function showSetup(m){$('splash').hidden=true;$('setup').hidden=false;typed='';draw();$('msg').textContent=m||'';$('msg').className='msg'+(m?' err':'');
+  if(!shown){shown=true;const keys=['1','2','3','4','5','6','7','8','9','清除','0','⌫','確定'];
+    $('pad').innerHTML=keys.map(k=>'<button class="btn'+(k==='清除'||k==='⌫'?' sm':k==='確定'?' ok':'')+'" data-k="'+k+'">'+k+'</button>').join('');
+    $('pad').querySelectorAll('button').forEach(b=>b.onclick=()=>press(b.dataset.k))}}
+function draw(){$('dots').innerHTML=Array.from({length:Math.max(6,typed.length)},(_,i)=>'<span class="'+(i<typed.length?'on':'')+'"></span>').join('');
+  const ok=$('pad').querySelector('[data-k="確定"]');if(ok)ok.disabled=typed.length<6}
+async function press(k){
+  if(k==='清除')typed='';else if(k==='⌫')typed=typed.slice(0,-1);
+  else if(k==='確定'){if(typed.length<6)return;$('msg').className='msg';$('msg').textContent='確認中…';
+    const r=await verify(typed);
+    if(r===true){code=typed;save(code);open('home');return}
+    $('msg').className='msg err';$('msg').textContent=r===null?'網路好像不太穩，請再按一次「確定」。':'家庭碼不對，請再試一次。';
+    if(r===false){typed='';$('dots').classList.remove('shake');void $('dots').offsetWidth;$('dots').classList.add('shake')}}
+  else if(typed.length<8)typed+=k;
+  draw()}
+
+/* 開始 */
+code=read();
+if(!code)showSetup();
+else{open('home');
+  verify(code).then(r=>{if(r===false){save('');code='';showSetup('家庭碼已經更換了，請家人重新輸入一次。')}})}
+</script>
+</body>
+</html>
