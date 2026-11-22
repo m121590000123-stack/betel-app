@@ -12,12 +12,9 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Huninn&display=swap" rel="stylesheet">
 <style>
 :root{--paper:#FFFCF6;--ink:#3E3A39;--coral:#F2A497;--yellow:#F6D27A;--water:#A8D3E6;--green:#B9DAA5;
-  font-family:'Huninn','PingFang TC','Noto Sans TC',sans-serif;color:var(--ink);background:var(--paper)}
+  font-family:'PingFang TC','Heiti TC','Noto Sans TC','Microsoft JhengHei',sans-serif;color:var(--ink);background:var(--paper)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--paper);overflow:hidden}
 #app{position:fixed;inset:0;width:100%;height:100%;border:0;background:var(--paper)}
@@ -86,11 +83,21 @@ function open(page){
   f.src=url(page);
   setTimeout(()=>{if(!$('splash').classList.contains('gone'))$('splashText').textContent='網路比較慢，再等一下下…'},8000)}
 
-/* 記帳頁、報表頁互相切換（只接受 Google Apps Script 頁面送來的訊息） */
+/* 幫記帳頁記住的東西。iPhone 把 App 完全關掉時，會清掉包在裡面的 Google 頁面自己記的東西，
+   所以改由外殼記住（外殼記的不會被清掉，跟家庭碼一樣）。 */
+const MEM={who:'betelWho',rt:'betelReportToken'};
+function memRead(k){try{return localStorage.getItem(k)||''}catch(e){return ''}}
+function memWrite(k,v){try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch(e){}}
+
+/* 記帳頁、報表頁互相切換，和幫忙記東西（只接受 Google Apps Script 頁面送來的訊息） */
 window.addEventListener('message',ev=>{
   let host='';try{host=new URL(ev.origin).hostname}catch(e){}
   if(!/\.googleusercontent\.com$/.test(host))return;
-  const d=ev.data||{};if(d.betel!=='nav')return;
+  const d=ev.data||{};
+  if(d.betel==='memGet'&&ev.source){const m={};Object.keys(MEM).forEach(k=>m[k]=memRead(MEM[k]));
+    try{ev.source.postMessage({betel:'mem',mem:m},ev.origin)}catch(e){}return}
+  if(d.betel==='memSet'){if(MEM[d.key])memWrite(MEM[d.key],String(d.value||'').slice(0,100));return}
+  if(d.betel!=='nav')return;
   if(d.page==='report'||d.page==='home')open(d.page==='report'?'report':'home')});
 
 /* 家庭碼輸入畫面 */
@@ -114,7 +121,10 @@ async function press(k){
 code=read();
 if(!code)showSetup();
 else{open('home');
-  verify(code).then(r=>{if(r===false){save('');code='';showSetup('家庭碼已經更換了，請家人重新輸入一次。')}})}
+  /* 等記帳頁出來之後才在背後確認家庭碼，不跟記帳頁搶時間 */
+  let checked=false;const later=()=>{if(checked)return;checked=true;
+    verify(code).then(r=>{if(r===false){save('');code='';showSetup('家庭碼已經更換了，請家人重新輸入一次。')}})};
+  $('app').addEventListener('load',later,{once:true});setTimeout(later,15000)}
 </script>
 </body>
 </html>
